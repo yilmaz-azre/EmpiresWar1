@@ -51,7 +51,10 @@
   #chatin{display:flex;border-top:1px solid #2c3a52}
   #chatin input{border:none;border-radius:0;background:transparent}
   /* minimap */
-  #minimap{position:fixed;right:12px;bottom:12px;z-index:10;border:2px solid #2c3a52;border-radius:10px;background:#10141c;cursor:pointer}
+  #minimap{position:fixed;right:12px;bottom:12px;z-index:10;border:2px solid #2c3a52;border-radius:10px;background:#10141c;cursor:pointer;touch-action:none}
+  #touchctrl{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:12;display:flex;flex-direction:column;gap:8px}
+  #touchctrl button{width:46px;height:46px;border-radius:13px;font-size:24px;line-height:1;font-weight:900;padding:0;background:rgba(16,20,28,.9);border:1px solid #2c3a52;color:#e8ecf4;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  #touchctrl button:active{background:#0d9488;border-color:#5eead4;transform:scale(.94)}
   #toast{position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:40;background:#7f1d1d;color:#fecaca;font-weight:800;padding:10px 20px;border-radius:12px;font-size:14px}
   #bulk{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);z-index:11;display:flex;gap:6px;align-items:center;background:rgba(16,20,28,.88);border:1px solid #2c3a52;border-radius:12px;padding:6px 10px;font-size:12px;color:#8fa1bd;font-weight:700}
   #bulk button{padding:6px 10px;font-size:12px}
@@ -75,8 +78,16 @@
     #chat{left:8px;right:8px;width:auto;bottom:62px;max-height:40vh}
     #toast{top:auto;bottom:110px;max-width:92vw;text-align:center}
     #bmenu{top:auto!important;bottom:62px;right:8px!important;left:8px;max-height:60vh;overflow:auto}
-    #bmenu button,#bldmenu button,#wmenu button{padding:11px 12px;font-size:14px}
+    #bmenu button,#bldmenu button,#wmenu button{padding:12px 14px;font-size:15px}
     .popup{max-width:92vw}
+    #wmenu,#bldmenu{left:8px!important;right:8px;top:auto!important;bottom:64px;min-width:0;max-width:none;max-height:58vh;overflow:auto;border-radius:14px}
+    #hud{padding-top:calc(6px + env(safe-area-inset-top));padding-left:calc(8px + env(safe-area-inset-left));padding-right:calc(8px + env(safe-area-inset-right))}
+    #touchctrl{right:calc(8px + env(safe-area-inset-right));gap:10px}
+    #touchctrl button{width:50px;height:50px}
+    #minimap{bottom:calc(8px + env(safe-area-inset-bottom))}
+    #bulk{bottom:calc(12px + env(safe-area-inset-bottom))}
+    #chat{bottom:calc(62px + env(safe-area-inset-bottom))}
+    #hWorld{display:none}
   }
   .cols{display:flex;gap:22px;flex-wrap:wrap}
   .cols>div{flex:1;min-width:240px}
@@ -144,7 +155,7 @@
   <button id="lobbyBtn">Lobi</button>
 </div>
 <div id="banner" class="hidden"></div>
-<div id="hint" class="hidden">Sürükle: kaydır &bull; Tekerlek / iki parmak: zoom &bull; Adamına tıkla: görev ver &bull; Binana tıkla: yönet &bull; Sağ tık/ESC: iptal</div>
+<div id="hint" class="hidden">Sürükle: kaydır &bull; Tekerlek / iki parmak: zoom &bull; Adamına tıkla: görev ver &bull; Binana tıkla: yönet &bull; Enter: chat &bull; Sağ tık/ESC: iptal</div>
 <div id="bulk" class="hidden">
   <span>Toplu görev:</span>
   <button data-b="wood">Odun</button>
@@ -187,6 +198,11 @@
   <div id="chatin"><input type="text" id="chattext" maxlength="120" placeholder="Mesaj..."><button id="chatsend">Gönder</button></div>
 </div>
 <canvas id="minimap" width="160" height="160" class="hidden"></canvas>
+<div id="touchctrl" class="hidden">
+  <button id="zoomIn" title="Yakınlaş" aria-label="Yakınlaş">+</button>
+  <button id="zoomOut" title="Uzaklaş" aria-label="Uzaklaş">−</button>
+  <button id="recenterBtn" title="Kampa dön" aria-label="Kampa dön">⌂</button>
+</div>
 <div id="toast" class="hidden"></div>
 
 <script>
@@ -261,15 +277,25 @@ function handle(m){
   else if(m.t==='nodeDel'){for(const id of m.ids){const o=nodes.get(id);if(o){nodeAt.delete(o.y*SIZE+o.x);nodes.delete(id);}}}
   else if(m.t==='you'){you.countryId=m.countryId;mode=null;setBanner(null);
     if(m.countryId)$('ccreate').classList.add('hidden');else $('ccreate').classList.remove('hidden');}
-  else if(m.t==='chat'){addChat(m.from,m.text);}
+  else if(m.t==='chat'){addChat(m.from,m.text,m.color,m.sys,m.country);}
   else if(m.t==='error'){toast(m.msg);resetCreateBtn();}
   else if(m.t==='worldDeleted'){toast('Dünya silindi');showLobby();}
 }
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(toast._t);toast._t=setTimeout(()=>$('toast').classList.add('hidden'),2500);}
-function addChat(from,text){
-  const d=document.createElement('div');const b=document.createElement('b');b.textContent=from+': ';
-  d.appendChild(b);d.appendChild(document.createTextNode(text));
-  const log=$('chatlog');log.appendChild(d);log.scrollTop=log.scrollHeight;
+let unread=0;
+function updateChatBtn(){$('chatBtn').textContent=unread?('Chat ('+unread+')'):'Chat';$('chatBtn').style.background=unread?'#b45309':'';}
+function addChat(from,text,color,sys,country){
+  const d=document.createElement('div');
+  if(sys){d.style.color='#fbbf24';d.style.fontStyle='italic';d.textContent=text;}
+  else{
+    const b=document.createElement('b');b.textContent=from+(country?' ('+country+')':'')+': ';
+    b.style.color=color||'#5eead4';
+    d.appendChild(b);d.appendChild(document.createTextNode(text));
+  }
+  const log=$('chatlog');log.appendChild(d);
+  while(log.children.length>100)log.removeChild(log.firstChild);
+  log.scrollTop=log.scrollHeight;
+  if($('chat').classList.contains('hidden')&&screen==='game'){unread++;updateChatBtn();}
 }
 
 /* ---------- lobi ---------- */
@@ -315,10 +341,10 @@ setInterval(()=>{if(screen==='lobby')send({t:'lobby'});},3000);
 function showLobby(){screen='lobby';$('lobby').classList.remove('hidden');$('hud').classList.add('hidden');
   $('minimap').classList.add('hidden');$('hint').classList.add('hidden');$('wmenu').classList.add('hidden');
   $('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');
-  $('chat').classList.add('hidden');$('bulk').classList.add('hidden');setBanner(null);send({t:'leave'});}
+  $('chat').classList.add('hidden');$('bulk').classList.add('hidden');$('touchctrl').classList.add('hidden');setBanner(null);send({t:'leave'});}
 function enterGame(){
   screen='game';$('lobby').classList.add('hidden');$('hud').classList.remove('hidden');
-  $('minimap').classList.remove('hidden');$('hint').classList.remove('hidden');
+  $('minimap').classList.remove('hidden');$('hint').classList.remove('hidden');$('touchctrl').classList.remove('hidden');
   buildMinimapBase();
   const my=state.countries.find(c=>c.id===you.countryId);
   if(my){const b=state.buildings.find(b=>b.c===my.id&&b.type==='camp');if(b){cam.x=b.x;cam.y=b.y;}}
@@ -402,10 +428,19 @@ function openBuildingMenu(b){
     setBanner(BUILDNAME[b.type]+' taşımak için boş kara karesine tıkla');};
   el.classList.remove('hidden');
 }
-$('chatBtn').onclick=()=>$('chat').classList.toggle('hidden');
+function toggleChat(force){
+  const c=$('chat');const open=force!=null?force:c.classList.contains('hidden');
+  c.classList.toggle('hidden',!open);
+  if(open){unread=0;updateChatBtn();const l=$('chatlog');l.scrollTop=l.scrollHeight;
+    if(!matchMedia('(pointer:coarse)').matches)setTimeout(()=>$('chattext').focus(),0);}
+}
+$('chatBtn').onclick=()=>toggleChat();
 function sendChat(){const t=$('chattext').value.trim();if(!t)return;send({t:'chat',text:t});$('chattext').value='';}
 $('chatsend').onclick=sendChat;
-$('chattext').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();e.stopPropagation();});
+$('chattext').addEventListener('keydown',e=>{
+  if(e.key==='Enter')sendChat();
+  if(e.key==='Escape'){$('chattext').blur();toggleChat(false);}
+  e.stopPropagation();});
 
 /* ---------- worker menu ---------- */
 const TASKNAME={wood:'Odun Kes',fish:'Balık Tut',mine:'Maden Kaz',iron:'Demir Kaz',build:'İnşa Et',idle:'Bekle',attack:'Saldırı'};
@@ -449,65 +484,67 @@ const s2w=(x,y)=>[(x-cv.width/2)/ts()+cam.x,(y-cv.height/2)/ts()+cam.y];
 const emptyLand=(x,y)=>x>=0&&y>=0&&x<SIZE&&y<SIZE&&tiles[y*SIZE+x]===0
   &&!nodeAt.has(y*SIZE+x)&&!state.buildings.some(b=>b.x===x&&b.y===y);
 
-cv.addEventListener('mousedown',e=>{if(e.button===0){mouse.down=true;mouse.panned=false;mouse.sx=e.clientX;mouse.sy=e.clientY;}});
-addEventListener('mousemove',e=>{
+/* ---------- girdi: Pointer Events (fare + dokunmatik tek ve sağlam sistem) ---------- */
+const coarse=matchMedia('(pointer:coarse)').matches;
+const pointers=new Map();
+let panState=null,pinch=null;
+cv.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  e.preventDefault();
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  mouse.x=e.clientX;mouse.y=e.clientY;mouse.down=true;
+  if(pointers.size===1){panState={id:e.pointerId,lx:e.clientX,ly:e.clientY,sx:e.clientX,sy:e.clientY,moved:false};pinch=null;}
+  else if(pointers.size===2){const [a,b]=[...pointers.values()];pinch={dist:Math.hypot(a.x-b.x,a.y-b.y)||1,zoom:cam.zoom};panState=null;}
+});
+cv.addEventListener('pointermove',e=>{
   mouse.x=e.clientX;mouse.y=e.clientY;
-  if(mouse.down){
-    const dx=e.clientX-mouse.sx,dy=e.clientY-mouse.sy;
-    if(Math.hypot(dx,dy)>6)mouse.panned=true;
-    if(mouse.panned){cam.x-=e.movementX/ts();cam.y-=e.movementY/ts();}
-  }else if(screen==='game'){
-    const [wx,wy]=s2w(e.clientX,e.clientY);
-    let over=false;
-    for(const k of state.workers){
-      if(k.c!==you.countryId)continue;
-      const p=renderPos.get(k.id)||k;
-      if(Math.hypot(p.x-wx,p.y-wy)<0.8){over=true;break;}
+  const p=pointers.get(e.pointerId);
+  if(!p){
+    if(screen==='game'&&!coarse){
+      const [wx,wy]=s2w(e.clientX,e.clientY);let over=false;
+      for(const k of state.workers){if(k.c!==you.countryId)continue;const rp=renderPos.get(k.id)||k;if(Math.hypot(rp.x-wx,rp.y-wy)<0.8){over=true;break;}}
+      cv.style.cursor=over?'pointer':(mode?'crosshair':'grab');
     }
-    cv.style.cursor=over?'pointer':(mode?'crosshair':'grab');
+    return;
+  }
+  p.x=e.clientX;p.y=e.clientY;
+  if(pinch&&pointers.size>=2){
+    const [a,b]=[...pointers.values()];
+    cam.zoom=clamp(pinch.zoom*Math.hypot(a.x-b.x,a.y-b.y)/pinch.dist,0.45,2.6);
+  }else if(panState&&e.pointerId===panState.id){
+    if(Math.hypot(e.clientX-panState.sx,e.clientY-panState.sy)>(coarse?12:6))panState.moved=true;
+    if(panState.moved){cam.x-=(e.clientX-panState.lx)/ts();cam.y-=(e.clientY-panState.ly)/ts();}
+    panState.lx=e.clientX;panState.ly=e.clientY;
   }
 });
-addEventListener('mouseup',e=>{
-  if(e.button===0&&mouse.down){mouse.down=false;if(!mouse.panned)handleClick(e.clientX,e.clientY);}
-});
+function endPointer(e){
+  if(!pointers.has(e.pointerId))return;
+  pointers.delete(e.pointerId);
+  if(panState&&e.pointerId===panState.id){
+    if(!panState.moved&&e.type==='pointerup')handleClick(e.clientX,e.clientY);
+    panState=null;
+  }
+  if(pointers.size<2)pinch=null;
+  if(pointers.size===1){const [id,p]=[...pointers.entries()][0];panState={id,lx:p.x,ly:p.y,sx:p.x,sy:p.y,moved:true};}
+  if(pointers.size===0)mouse.down=false;
+}
+cv.addEventListener('pointerup',endPointer);
+cv.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);panState=null;pinch=null;mouse.down=false;});
 cv.addEventListener('contextmenu',e=>{e.preventDefault();cancelMode();});
-/* ---------- dokunmatik ---------- */
-const touch={mode:0,sx:0,sy:0,lx:0,ly:0,moved:false,dist:0,zoom:1};
-const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
-cv.addEventListener('touchstart',e=>{
-  e.preventDefault();
-  const t=e.touches;
-  if(t.length===1){touch.mode=1;touch.sx=touch.lx=t[0].clientX;touch.sy=touch.ly=t[0].clientY;touch.moved=false;mouse.x=t[0].clientX;mouse.y=t[0].clientY;}
-  else if(t.length>=2){touch.mode=2;touch.moved=true;touch.dist=tdist(t);touch.zoom=cam.zoom;}
-},{passive:false});
-cv.addEventListener('touchmove',e=>{
-  e.preventDefault();
-  const t=e.touches;
-  if(touch.mode===1&&t.length===1){
-    const x=t[0].clientX,y=t[0].clientY;
-    if(Math.hypot(x-touch.sx,y-touch.sy)>10)touch.moved=true;
-    if(touch.moved){cam.x-=(x-touch.lx)/ts();cam.y-=(y-touch.ly)/ts();}
-    touch.lx=x;touch.ly=y;mouse.x=x;mouse.y=y;
-  }else if(t.length>=2){
-    if(touch.mode!==2){touch.mode=2;touch.dist=tdist(t);touch.zoom=cam.zoom;}
-    cam.zoom=clamp(touch.zoom*tdist(t)/touch.dist,0.45,2.6);
-  }
-},{passive:false});
-cv.addEventListener('touchend',e=>{
-  e.preventDefault();
-  if(touch.mode===1&&!touch.moved&&e.changedTouches.length){
-    const t=e.changedTouches[0];mouse.x=t.clientX;mouse.y=t.clientY;handleClick(t.clientX,t.clientY);
-  }
-  if(e.touches.length===0)touch.mode=0;
-  else if(e.touches.length===1){touch.mode=1;touch.moved=true;touch.lx=e.touches[0].clientX;touch.ly=e.touches[0].clientY;}
-},{passive:false});
-cv.addEventListener('touchcancel',()=>{touch.mode=0;});
 cv.addEventListener('wheel',e=>{e.preventDefault();cam.zoom=clamp(cam.zoom*(e.deltaY>0?0.9:1.1),0.45,2.6);},{passive:false});
+/* ---------- görünür zoom / merkez kontrolleri ---------- */
+function zoomBy(f){cam.zoom=clamp(cam.zoom*f,0.45,2.6);}
+function recenter(){const my=state.countries.find(c=>c.id===you.countryId);const b=my&&state.buildings.find(b=>b.c===my.id&&b.type==='camp');if(b){cam.x=b.x;cam.y=b.y;}else{cam.x=SIZE/2;cam.y=SIZE/2;}}
+$('zoomIn').onclick=()=>zoomBy(1.25);
+$('zoomOut').onclick=()=>zoomBy(0.8);
+$('recenterBtn').onclick=recenter;
 const isTyping=()=>{const a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA');};
 function cancelMode(){mode=null;setBanner(null);selectedWorker=null;
   $('wmenu').classList.add('hidden');$('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');}
 addEventListener('keydown',e=>{
   if(isTyping())return;
+  if(screen==='game'&&(e.code==='Enter'||e.code==='KeyT')){e.preventDefault();toggleChat(true);return;}
   if(e.code==='Escape'){cancelMode();return;}
   if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
   keys[e.code]=true;
@@ -554,7 +591,7 @@ function handleClick(mx,my){
     return;
   }
   const myC=you.countryId;
-  let best=null,bd=0.8;
+  let best=null,bd=coarse?1.5:0.8;
   for(const k of state.workers){
     if(k.c!==myC)continue;
     const p=renderPos.get(k.id)||k;
@@ -564,7 +601,7 @@ function handleClick(mx,my){
   if(best){openWorkerMenu(best);return;}
   for(const b of state.buildings){
     if(b.c!==myC||b.type==='house'||!b.done)continue;
-    if(Math.hypot(b.x-wx,b.y-wy)<0.8){openBuildingMenu(b);return;}
+    if(Math.hypot(b.x-wx,b.y-wy)<(coarse?1.5:0.8)){openBuildingMenu(b);return;}
   }
   selectedWorker=null;$('wmenu').classList.add('hidden');
 }
@@ -577,11 +614,12 @@ function buildMinimapBase(){
   const g=mmBase.getContext('2d');
   for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){g.fillStyle=tiles[y*SIZE+x]===1?'#2563eb':'#3f8f4f';g.fillRect(x,y,1,1);}
 }
-mm.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0],r=mm.getBoundingClientRect();cam.x=(t.clientX-r.left)/r.width*SIZE;cam.y=(t.clientY-r.top)/r.height*SIZE;},{passive:false});
-mm.addEventListener('mousedown',e=>{
-  const r=mm.getBoundingClientRect();
-  cam.x=(e.clientX-r.left)/r.width*SIZE;cam.y=(e.clientY-r.top)/r.height*SIZE;
-});
+let mmDown=false;
+const mmJump=e=>{const r=mm.getBoundingClientRect();cam.x=clamp((e.clientX-r.left)/r.width,0,1)*SIZE;cam.y=clamp((e.clientY-r.top)/r.height,0,1)*SIZE;};
+mm.addEventListener('pointerdown',e=>{e.preventDefault();mmDown=true;try{mm.setPointerCapture(e.pointerId);}catch(_){}mmJump(e);});
+mm.addEventListener('pointermove',e=>{if(mmDown)mmJump(e);});
+mm.addEventListener('pointerup',()=>{mmDown=false;});
+mm.addEventListener('pointercancel',()=>{mmDown=false;});
 function drawMinimap(){
   if(!mmBase)return;
   mmx.clearRect(0,0,160,160);mmx.drawImage(mmBase,0,0,160,160);
