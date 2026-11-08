@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ülke Oyunu - Multiplayer Strateji</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#10141c;font-family:'Segoe UI',system-ui,sans-serif;color:#e8ecf4;user-select:none}
+  #game{position:fixed;inset:0;display:block;cursor:crosshair}
+  .hidden{display:none!important}
+  .overlay{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:rgba(10,14,22,.94)}
+  .panel{background:#1a2130;border:1px solid #2c3a52;border-radius:16px;padding:26px 30px;max-width:min(94vw,760px);width:100%;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  h1{font-size:28px;font-weight:900;letter-spacing:.5px;margin-bottom:4px}
+  h1 span{color:#5eead4}
+  .sub{color:#8fa1bd;font-size:13px;margin-bottom:18px}
+  label{display:block;font-size:12px;color:#8fa1bd;margin:10px 0 4px;font-weight:700}
+  input[type=text],input[type=password]{width:100%;padding:10px 12px;border-radius:9px;border:1px solid #2c3a52;background:#10141c;color:#e8ecf4;font-size:14px;outline:none}
+  input:focus{border-color:#5eead4}
+  button{cursor:pointer;border:none;border-radius:9px;font-weight:800;font-size:13px;padding:10px 16px;background:#2c3a52;color:#e8ecf4;transition:filter .12s}
+  button:hover{filter:brightness(1.2)}
+  button.primary{background:#0d9488;color:#fff}
+  button.danger{background:#7f1d1d;color:#fecaca}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .worldlist{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+  .world{display:flex;align-items:center;gap:10px;background:#10141c;border:1px solid #2c3a52;border-radius:11px;padding:10px 14px}
+  .world .nm{font-weight:800;font-size:15px;flex:1}
+  .world .meta{color:#8fa1bd;font-size:12px}
+  .lock{color:#fbbf24;font-weight:900}
+  .swatches{display:flex;gap:8px;margin-top:6px}
+  .sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer}
+  .sw.sel{border-color:#fff;box-shadow:0 0 0 2px #0d9488}
+  /* HUD */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:14px;padding:10px 14px;background:linear-gradient(180deg,rgba(10,14,22,.92),rgba(10,14,22,.6) 80%,transparent);pointer-events:none;flex-wrap:wrap}
+  #hud>*{pointer-events:auto}
+  .chip{display:flex;align-items:center;gap:7px;background:rgba(16,20,28,.85);border:1px solid #2c3a52;border-radius:10px;padding:7px 12px;font-weight:800;font-size:14px}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .res-wood{color:#d6a35c}.res-fish{color:#7dd3fc}.res-stone{color:#cbd5e1}.res-iron{color:#f59e0b}
+  #hud .spacer{flex:1}
+  #banner{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:12;background:#0d9488;color:#fff;font-weight:800;padding:9px 20px;border-radius:24px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  #hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;color:#8fa1bd;font-size:12px;background:rgba(16,20,28,.7);padding:6px 14px;border-radius:16px;pointer-events:none}
+  /* worker menu */
+  #wmenu,.popup{position:fixed;z-index:20;background:#1a2130;border:1px solid #2c3a52;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:150px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  #wmenu .ttl,.popup .ttl{font-size:12px;color:#8fa1bd;font-weight:800;margin-bottom:2px}
+  #wmenu button,.popup button{text-align:left;padding:8px 12px}
+  #wmenu button.on{background:#0d9488;color:#fff}
+  /* chat */
+  #chat{position:fixed;left:12px;bottom:12px;z-index:15;width:300px;background:rgba(16,20,28,.9);border:1px solid #2c3a52;border-radius:12px;display:flex;flex-direction:column;max-height:260px}
+  #chatlog{flex:1;overflow-y:auto;padding:10px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+  #chatlog b{color:#5eead4}
+  #chatin{display:flex;border-top:1px solid #2c3a52}
+  #chatin input{border:none;border-radius:0;background:transparent}
+  /* minimap */
+  #minimap{position:fixed;right:12px;bottom:12px;z-index:10;border:2px solid #2c3a52;border-radius:10px;background:#10141c;cursor:pointer}
+  #toast{position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:40;background:#7f1d1d;color:#fecaca;font-weight:800;padding:10px 20px;border-radius:12px;font-size:14px}
+  #bulk{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);z-index:11;display:flex;gap:6px;align-items:center;background:rgba(16,20,28,.88);border:1px solid #2c3a52;border-radius:12px;padding:6px 10px;font-size:12px;color:#8fa1bd;font-weight:700}
+  #bulk button{padding:6px 10px;font-size:12px}
+  .cols{display:flex;gap:22px;flex-wrap:wrap}
+  .cols>div{flex:1;min-width:240px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- LOBBY -->
+<div id="lobby" class="overlay">
+  <div class="panel">
+    <h1>ÜLKE <span>OYUNU</span></h1>
+    <div class="sub">Multiplayer strateji &bull; dünyalar kalıcıdır, sahibi silene kadar kalır &bull; özel dünyalar şifrelidir</div>
+    <div class="sub" id="connstat" style="color:#fbbf24;margin-bottom:10px">Sunucuya bağlanılıyor...</div>
+    <div class="cols">
+      <div>
+        <label>Oyuncu adın</label>
+        <input type="text" id="pname" maxlength="20" placeholder="Adın">
+        <label>Yeni dünya oluştur</label>
+        <input type="text" id="wname" maxlength="24" placeholder="Dünya adı">
+        <label>Şifre (boş = herkese açık)</label>
+        <input type="password" id="wpass" maxlength="30" placeholder="İsteğe bağlı">
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="createBtn">Dünya Oluştur</button>
+          <button id="refreshBtn">Yenile</button>
+        </div>
+      </div>
+      <div>
+        <label>Dünyalar</label>
+        <div class="worldlist" id="worldlist"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COUNTRY CREATE -->
+<div id="ccreate" class="overlay hidden">
+  <div class="panel" style="max-width:420px">
+    <h1 style="font-size:22px">Ülkeni Kur</h1>
+    <div class="sub">Adını ve rengini seç, sonra haritada bir yere kamp ateşi kur. 2 adamla başlarsın.</div>
+    <label>Ülke adı</label>
+    <input type="text" id="cname" maxlength="20" placeholder="Örn: Anadolu">
+    <label>Renk</label>
+    <div class="swatches" id="csw"></div>
+    <div class="row" style="margin-top:16px"><button class="primary" id="cbBtn">Kur ve Kamp Yerleştir</button></div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="chip"><span class="dot" id="hCd"></span><span id="hCn">—</span></div>
+  <div class="chip res-wood">Odun <span id="hWood">0</span></div>
+  <div class="chip res-fish">Balık <span id="hFish">0</span></div>
+  <div class="chip res-stone">Taş <span id="hStone">0</span></div>
+  <div class="chip res-iron">Demir <span id="hIron">0</span></div>
+  <div class="chip">Nüfus <span id="hPop">0/0</span></div>
+  <div class="chip" style="color:#fbbf24"><span id="hEra">İlkel Çağ</span> <span style="color:#8fa1bd;font-weight:600">Sv <span id="hLvl">1</span></span></div>
+  <div class="spacer"></div>
+  <div class="chip" style="font-weight:600;color:#8fa1bd" id="hWorld"></div>
+  <div class="chip" style="font-weight:600;color:#8fa1bd">Çevrimiçi <span id="hOnline">1</span></div>
+  <button id="buildBtn" class="primary">İnşa Et</button>
+  <button id="attackBtn" class="danger">Saldırı</button>
+  <button id="clearBtn">Temizle</button>
+  <button id="chatBtn">Chat</button>
+  <button id="lobbyBtn">Lobi</button>
+</div>
+<div id="banner" class="hidden"></div>
+<div id="hint" class="hidden">Sürükle: kaydır &bull; Tekerlek: zoom &bull; Adamına tıkla: görev ver &bull; Binana tıkla: yönet &bull; Sağ tık/ESC: iptal</div>
+<div id="bulk" class="hidden">
+  <span>Toplu görev:</span>
+  <button data-b="wood">Odun</button>
+  <button data-b="fish">Balık</button>
+  <button data-b="mine">Maden</button>
+  <button data-b="iron">Demir</button>
+  <button data-b="build">İnşa</button>
+  <button data-b="idle">Bekle</button>
+</div>
+
+<div id="wmenu" class="hidden">
+  <div class="ttl" id="wmTitle">Görev ver</div>
+  <button data-task="wood">Odun Kes</button>
+  <button data-task="fish">Balık Tut</button>
+  <button data-task="mine">Maden Kaz</button>
+  <button data-task="iron">Demir Kaz</button>
+  <button data-task="build">İnşa Et</button>
+  <button data-task="attack" id="wmAttack" class="hidden" style="background:#7f1d1d;color:#fecaca">Saldır</button>
+  <button data-task="idle">Bekle</button>
+</div>
+
+<div id="bmenu" class="popup hidden" style="top:60px;right:14px">
+  <div class="ttl">Ne inşa edelim?</div>
+  <button data-build="house">Ev (25 odun, 15 taş) → +2 nüfus</button>
+  <button data-build="barracks">Asker Kampı (30 odun, 20 taş)</button>
+  <button data-build="smith">Demirci (20 odun, 30 taş)</button>
+  <button data-build="depo">Depo (20 odun, 10 taş)</button>
+  <button data-build="tower">Gözcü Kulesi (25 odun, 15 taş)</button>
+  <button data-build="wall">Sur (5 taş) — tıklayarak seri diz</button>
+</div>
+
+<div id="bldmenu" class="popup hidden">
+  <div class="ttl" id="blTitle"></div>
+  <button id="blAct" class="primary"></button>
+  <button id="blMove">Taşı</button>
+</div>
+
+<div id="chat" class="hidden">
+  <div id="chatlog"></div>
+  <div id="chatin"><input type="text" id="chattext" maxlength="120" placeholder="Mesaj..."><button id="chatsend">Gönder</button></div>
+</div>
+<canvas id="minimap" width="160" height="160" class="hidden"></canvas>
+<div id="toast" class="hidden"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+if(location.protocol==='file:'){
+  document.body.innerHTML='<div style="max-width:600px;margin:80px auto;font-family:sans-serif;line-height:1.7;color:#e8ecf4"><h2>Dosyayı doğrudan açtın</h2><p>Bu oyun sunucu üzerinden çalışır, çift tıklayarak açılmaz. Tarayıcıda <b>http://localhost:3000</b> adresine git.</p><p>Sunucu kapalıysa: <code>ulke-oyunu</code> klasöründe <code>node server.js</code> komutunu çalıştır.</p></div>';
+  throw new Error('file:// desteklenmiyor');
+}
+const COLORS=['#e53935','#1e88e5','#43a047','#fdd835','#8e24aa','#ff7043','#26c6da','#ec407a'];
+let selColor=COLORS[0];
+
+/* ---------- kimlik ---------- */
+let playerId=localStorage.getItem('ulke_pid');
+if(!playerId){playerId='p'+Math.random().toString(36).slice(2,10);localStorage.setItem('ulke_pid',playerId);}
+let playerName=localStorage.getItem('ulke_name')||'';
+$('pname').value=playerName;
+
+/* ---------- durum ---------- */
+let ws=null, screen='lobby', connected=false, lastPass='';
+const outbox=[];
+let world=null, SIZE=80, tiles=[], nodes=new Map(), nodeAt=new Set(), wallAt=new Set();
+let state={workers:[],buildings:[],countries:[],online:1};
+let countryMap=new Map();
+let you={playerId,countryId:null};
+let cam={x:40,y:40,zoom:1};
+let mode=null, pendingCountry=null, selectedWorker=null;
+let mouse={x:0,y:0,down:false,panned:false,sx:0,sy:0};
+const renderPos=new Map();
+const keys={};
+
+/* ---------- websocket ---------- */
+function setConn(t){$('connstat').textContent=t;}
+function connect(){
+  setConn('Sunucuya bağlanılıyor...');
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws.onopen=()=>{
+    connected=true;setConn('Sunucuya bağlı ✓');
+    ws.send(JSON.stringify({t:'hello',playerId,name:playerName||'Guest'}));
+    if(screen==='game'&&world)ws.send(JSON.stringify({t:'joinWorld',id:world.id,password:lastPass}));
+    while(outbox.length)ws.send(JSON.stringify(outbox.shift()));
+  };
+  ws.onmessage=e=>handle(JSON.parse(e.data));
+  ws.onclose=()=>{connected=false;setConn('Bağlantı koptu, yeniden bağlanılıyor...');setTimeout(connect,1500);};
+}
+const send=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));else{outbox.push(o);if(outbox.length>40)outbox.shift();}};
+function resetCreateBtn(){const b=$('createBtn');b.disabled=false;b.textContent='Dünya Oluştur';}
+function handle(m){
+  if(m.t==='lobby')renderLobby(m.worlds);
+  else if(m.t==='joined'){
+    world=m.world;SIZE=m.size;tiles=m.tiles;
+    nodes=new Map(m.nodes.map(n=>[n[0],{id:n[0],type:n[1],x:n[2],y:n[3],amount:n[4]}]));
+    nodeAt=new Set(m.nodes.map(n=>n[3]*SIZE+n[2]));
+    state={workers:m.workers,buildings:m.buildings,countries:m.countries,online:m.online};
+    countryMap=new Map(m.countries.map(c=>[c.id,c]));
+    wallAt=new Set(m.buildings.filter(b=>b.type==='wall'&&b.done).map(b=>b.y*SIZE+b.x));
+    you=m.you;
+    resetCreateBtn();
+    enterGame();
+  }
+  else if(m.t==='state'){
+    state={workers:m.workers,buildings:m.buildings,countries:m.countries,online:m.online};
+    countryMap=new Map(m.countries.map(c=>[c.id,c]));
+    wallAt=new Set(m.buildings.filter(b=>b.type==='wall'&&b.done).map(b=>b.y*SIZE+b.x));
+    if(renderPos.size>m.workers.length+8){
+      const ids=new Set(m.workers.map(k=>k.id));
+      for(const id of renderPos.keys())if(!ids.has(id))renderPos.delete(id);
+    }
+  }
+  else if(m.t==='nodes'){for(const n of m.nodes){const o=nodes.get(n[0]);if(o)o.amount=n[4];else{nodes.set(n[0],{id:n[0],type:n[1],x:n[2],y:n[3],amount:n[4]});if(n[1]!=='fish')nodeAt.add(n[3]*SIZE+n[2]);}}}
+  else if(m.t==='nodeDel'){for(const id of m.ids){const o=nodes.get(id);if(o){nodeAt.delete(o.y*SIZE+o.x);nodes.delete(id);}}}
+  else if(m.t==='you'){you.countryId=m.countryId;mode=null;setBanner(null);
+    if(m.countryId)$('ccreate').classList.add('hidden');else $('ccreate').classList.remove('hidden');}
+  else if(m.t==='chat'){addChat(m.from,m.text);}
+  else if(m.t==='error'){toast(m.msg);resetCreateBtn();}
+  else if(m.t==='worldDeleted'){toast('Dünya silindi');showLobby();}
+}
+function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(toast._t);toast._t=setTimeout(()=>$('toast').classList.add('hidden'),2500);}
+function addChat(from,text){
+  const d=document.createElement('div');const b=document.createElement('b');b.textContent=from+': ';
+  d.appendChild(b);d.appendChild(document.createTextNode(text));
+  const log=$('chatlog');log.appendChild(d);log.scrollTop=log.scrollHeight;
+}
+
+/* ---------- lobi ---------- */
+function renderLobby(list){
+  const el=$('worldlist');el.innerHTML='';
+  if(!list.length){el.innerHTML='<div class="sub">Henüz dünya yok. İlk dünyayı sen oluştur!</div>';return;}
+  list.sort((a,b)=>b.online-a.online||b.createdAt-a.createdAt);
+  for(const w of list){
+    const row=document.createElement('div');row.className='world';
+    const nm=document.createElement('div');nm.className='nm';
+    nm.textContent=w.name;
+    if(w.hasPassword){const l=document.createElement('span');l.className='lock';l.textContent=' [şifreli]';nm.appendChild(l);}
+    const meta=document.createElement('div');meta.className='meta';
+    meta.textContent=`${w.countries} ülke · ${w.online} çevrimiçi · sahip: ${w.ownerName}`;
+    const join=document.createElement('button');join.className='primary';join.textContent='Katıl';
+    join.onclick=()=>{
+      let pass='';
+      if(w.hasPassword){pass=prompt('Dünya şifresi:');if(pass===null)return;}
+      lastPass=pass;
+      send({t:'joinWorld',id:w.id,password:pass});
+    };
+    row.append(nm,meta,join);
+    if(w.ownerId===playerId){
+      const del=document.createElement('button');del.className='danger';del.textContent='Sil';
+      del.onclick=()=>{if(confirm(`"${w.name}" dünyası kalıcı olarak silinsin mi?`))send({t:'deleteWorld',id:w.id});};
+      row.appendChild(del);
+    }
+    el.appendChild(row);
+  }
+}
+$('pname').addEventListener('change',()=>{playerName=$('pname').value.trim();localStorage.setItem('ulke_name',playerName);send({t:'hello',playerId,name:playerName||'Guest'});});
+$('createBtn').onclick=()=>{
+  const name=$('wname').value.trim();if(!name)return toast('Dünya adı gerekli');
+  if(!connected)return toast('Sunucu bağlı değil — sayfayı http://localhost:3000 adresinden aç');
+  lastPass=$('wpass').value;
+  const b=$('createBtn');b.disabled=true;b.textContent='Oluşturuluyor...';
+  send({t:'createWorld',name,password:lastPass});
+};
+$('refreshBtn').onclick=()=>send({t:'lobby'});
+setInterval(()=>{if(screen==='lobby')send({t:'lobby'});},3000);
+
+/* ---------- ekran geçişi ---------- */
+function showLobby(){screen='lobby';$('lobby').classList.remove('hidden');$('hud').classList.add('hidden');
+  $('minimap').classList.add('hidden');$('hint').classList.add('hidden');$('wmenu').classList.add('hidden');
+  $('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');
+  $('chat').classList.add('hidden');$('bulk').classList.add('hidden');setBanner(null);send({t:'leave'});}
+function enterGame(){
+  screen='game';$('lobby').classList.add('hidden');$('hud').classList.remove('hidden');
+  $('minimap').classList.remove('hidden');$('hint').classList.remove('hidden');
+  buildMinimapBase();
+  const my=state.countries.find(c=>c.id===you.countryId);
+  if(my){const b=state.buildings.find(b=>b.c===my.id&&b.type==='camp');if(b){cam.x=b.x;cam.y=b.y;}}
+  else{cam.x=SIZE/2;cam.y=SIZE/2;$('ccreate').classList.remove('hidden');}
+  $('hWorld').textContent=world.name;
+}
+$('lobbyBtn').onclick=showLobby;
+$('cbBtn').onclick=()=>{
+  const name=$('cname').value.trim();if(!name)return toast('Ülke adı gerekli');
+  pendingCountry={name,color:selColor};
+  $('ccreate').classList.add('hidden');mode='found';setBanner('Kamp ateşini kurmak için boş bir kara karesine tıkla');
+};
+{
+  const sw=$('csw');COLORS.forEach((c,i)=>{
+    const d=document.createElement('div');d.className='sw'+(i===0?' sel':'');d.style.background=c;
+    d.onclick=()=>{selColor=c;sw.querySelectorAll('.sw').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');};
+    sw.appendChild(d);
+  });
+}
+function setBanner(t){const b=$('banner');if(t){b.textContent=t;b.classList.remove('hidden');}else b.classList.add('hidden');}
+
+/* ---------- HUD / build / chat ---------- */
+const BUILDNAME={house:'Ev',barracks:'Asker Kampı',smith:'Demirci',depo:'Depo',tower:'Gözcü Kulesi',wall:'Sur'};
+let pendingBuild='house',movingBuilding=null;
+$('buildBtn').onclick=()=>{
+  if(!you.countryId)return toast('Önce ülke kur');
+  $('bldmenu').classList.add('hidden');
+  $('bmenu').classList.toggle('hidden');
+};
+$('bmenu').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    pendingBuild=b.dataset.build;
+    $('bmenu').classList.add('hidden');
+    mode='build';selectedWorker=null;$('wmenu').classList.add('hidden');
+    setBanner(BUILDNAME[pendingBuild]+' için boş kara karesine tıkla');
+  };
+});
+$('attackBtn').onclick=()=>{
+  if(!you.countryId)return toast('Önce ülke kur');
+  const soldiers=state.workers.filter(k=>k.c===you.countryId&&k.sol);
+  if(!soldiers.length)return toast('Askerin yok — Asker Kampı inşa edip binaya tıklayarak asker yetiştir');
+  mode='attack';selectedWorker=null;$('wmenu').classList.add('hidden');$('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');
+  setBanner('Saldırı: düşman işçisine veya binasına tıkla ('+soldiers.length+' asker saldıracak)');
+};
+$('clearBtn').onclick=()=>{
+  if(!you.countryId)return toast('Önce ülke kur');
+  mode='clear';selectedWorker=null;$('wmenu').classList.add('hidden');$('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');
+  setBanner('Temizle: yok etmek istediğin ağaca veya madene tıkla (kalıcı silinir, az kaynak verir)');
+};
+function openBuildingMenu(b){
+  const el=$('bldmenu');const act=$('blAct');const mv=$('blMove');const my=countryOf(b.c);
+  const [sx,sy]=w2s(b.x,b.y);
+  el.style.left=clamp(sx+18,4,innerWidth-280)+'px';
+  el.style.top=clamp(sy-60,60,innerHeight-180)+'px';
+  let title='',action=null;
+  if(b.type==='camp'){
+    title='Kamp Ateşi — Seviye '+(b.lvl||1);
+    action={txt:`Yükselt (${15*(b.lvl||1)} odun, ${10*(b.lvl||1)} taş) → +2 nüfus, +1 işçi`,fn:()=>send({t:'upgradeCamp'})};
+  }else if(b.type==='barracks'){
+    title='Asker Kampı';
+    const locked=(my&&(my.era||0)<1);
+    action={txt:locked?'Asker için kamp Sv10 (Taş Devri) gerekli':'Asker Yetiştir (10 balık, 5 odun)',fn:()=>send({t:'train'})};
+  }else if(b.type==='smith'){
+    title='Demirci — Zırh seviye '+((my&&my.armor)||0)+'/3';
+    action={txt:'Zırh Yükselt ('+(10*(((my&&my.armor)||0)+1))+' demir) → tüm işçilere +2 can',fn:()=>send({t:'upgradeArmor'})};
+  }else if(b.type==='depo'){
+    title='Depo — kaynaklar burada güvende';
+    if(!state.buildings.some(x=>x.c===b.c&&x.type==='camp'))
+      action={txt:'Kamp Yeniden Kur (20 odun, 10 taş)',fn:()=>{mode='rebuildCamp';setBanner('Yeni kamp için boş kara karesine tıkla');}};
+  }else if(b.type==='tower'){
+    title='Gözcü Kulesi — 6 kare menzil, otomatik ok';
+  }else if(b.type==='wall'){
+    title='Sur — düşman yolunu keser';
+  }else return;
+  $('blTitle').textContent=title;
+  if(action){act.textContent=action.txt;act.onclick=()=>{action.fn();el.classList.add('hidden');};act.classList.remove('hidden');}
+  else act.classList.add('hidden');
+  mv.classList.toggle('hidden',!b.done);
+  mv.onclick=()=>{el.classList.add('hidden');mode='moveBuilding';movingBuilding=b.id;
+    setBanner(BUILDNAME[b.type]+' taşımak için boş kara karesine tıkla');};
+  el.classList.remove('hidden');
+}
+$('chatBtn').onclick=()=>$('chat').classList.toggle('hidden');
+function sendChat(){const t=$('chattext').value.trim();if(!t)return;send({t:'chat',text:t});$('chattext').value='';}
+$('chatsend').onclick=sendChat;
+$('chattext').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();e.stopPropagation();});
+
+/* ---------- worker menu ---------- */
+const TASKNAME={wood:'Odun Kes',fish:'Balık Tut',mine:'Maden Kaz',iron:'Demir Kaz',build:'İnşa Et',idle:'Bekle',attack:'Saldırı'};
+$('wmenu').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    const t=b.dataset.task;
+    if(t==='attack'){
+      $('wmenu').classList.add('hidden');
+      mode='attack';setBanner('Saldırı: düşman işçisine veya binasına tıkla');
+      return;
+    }
+    if(selectedWorker!=null)send({t:'task',id:selectedWorker,task:t});
+    $('wmenu').classList.add('hidden');selectedWorker=null;
+  };
+});
+$('bulk').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    const t=b.dataset.b;let n=0;
+    for(const k of state.workers)if(k.c===you.countryId){send({t:'task',id:k.id,task:t});n++;}
+    toast(n+' işçiye görev verildi: '+(TASKNAME[t]||t));
+  };
+});
+function openWorkerMenu(w){
+  selectedWorker=w.id;
+  $('wmTitle').textContent=(w.sol?'Asker':'İşçi')+' — görev ver (şimdi: '+(TASKNAME[w.task]||'-')+')';
+  $('wmenu').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.task===w.task));
+  $('wmAttack').classList.toggle('hidden',!w.sol);
+  const el=$('wmenu');el.classList.remove('hidden');
+  const p=renderPos.get(w.id)||w;const [sx,sy]=w2s(p.x,p.y);
+  el.style.left=clamp(sx+18,4,innerWidth-170)+'px';
+  el.style.top=clamp(sy-70,60,innerHeight-280)+'px';
+}
+
+/* ---------- canvas / kamera ---------- */
+const cv=$('game'),ctx=cv.getContext('2d');
+function resize(){cv.width=innerWidth;cv.height=innerHeight;}
+addEventListener('resize',resize);resize();
+const ts=()=>28*cam.zoom;
+const w2s=(x,y)=>[(x-cam.x)*ts()+cv.width/2,(y-cam.y)*ts()+cv.height/2];
+const s2w=(x,y)=>[(x-cv.width/2)/ts()+cam.x,(y-cv.height/2)/ts()+cam.y];
+const emptyLand=(x,y)=>x>=0&&y>=0&&x<SIZE&&y<SIZE&&tiles[y*SIZE+x]===0
+  &&!nodeAt.has(y*SIZE+x)&&!state.buildings.some(b=>b.x===x&&b.y===y);
+
+cv.addEventListener('mousedown',e=>{if(e.button===0){mouse.down=true;mouse.panned=false;mouse.sx=e.clientX;mouse.sy=e.clientY;}});
+addEventListener('mousemove',e=>{
+  mouse.x=e.clientX;mouse.y=e.clientY;
+  if(mouse.down){
+    const dx=e.clientX-mouse.sx,dy=e.clientY-mouse.sy;
+    if(Math.hypot(dx,dy)>6)mouse.panned=true;
+    if(mouse.panned){cam.x-=e.movementX/ts();cam.y-=e.movementY/ts();}
+  }else if(screen==='game'){
+    const [wx,wy]=s2w(e.clientX,e.clientY);
+    let over=false;
+    for(const k of state.workers){
+      if(k.c!==you.countryId)continue;
+      const p=renderPos.get(k.id)||k;
+      if(Math.hypot(p.x-wx,p.y-wy)<0.8){over=true;break;}
+    }
+    cv.style.cursor=over?'pointer':(mode?'crosshair':'grab');
+  }
+});
+addEventListener('mouseup',e=>{
+  if(e.button===0&&mouse.down){mouse.down=false;if(!mouse.panned)handleClick(e.clientX,e.clientY);}
+});
+cv.addEventListener('contextmenu',e=>{e.preventDefault();cancelMode();});
+cv.addEventListener('wheel',e=>{e.preventDefault();cam.zoom=clamp(cam.zoom*(e.deltaY>0?0.9:1.1),0.45,2.6);},{passive:false});
+const isTyping=()=>{const a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA');};
+function cancelMode(){mode=null;setBanner(null);selectedWorker=null;
+  $('wmenu').classList.add('hidden');$('bmenu').classList.add('hidden');$('bldmenu').classList.add('hidden');}
+addEventListener('keydown',e=>{
+  if(isTyping())return;
+  if(e.code==='Escape'){cancelMode();return;}
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
+  keys[e.code]=true;
+});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouse.down=false;});
+
+function handleClick(mx,my){
+  if(screen!=='game')return;
+  const [wx,wy]=s2w(mx,my);const tx=Math.round(wx),ty=Math.round(wy);
+  $('bldmenu').classList.add('hidden');$('bmenu').classList.add('hidden');
+  if(mode==='found'&&pendingCountry){send({t:'foundCountry',name:pendingCountry.name,color:pendingCountry.color,x:tx,y:ty});return;}
+  if(mode==='rebuildCamp'){send({t:'rebuildCamp',x:tx,y:ty});mode=null;setBanner(null);return;}
+  if(mode==='moveBuilding'){send({t:'moveBuilding',id:movingBuilding,x:tx,y:ty});mode=null;setBanner(null);movingBuilding=null;return;}
+  if(mode==='clear'){
+    let node=null;
+    for(const n of nodes.values()){if(n.type!=='fish'&&n.x===tx&&n.y===ty){node=n;break;}}
+    if(!node)return toast('Burada ağaç veya maden yok');
+    send({t:'clearNode',id:node.id});
+    return;
+  }
+  if(mode==='build'){send({t:'build',type:pendingBuild,x:tx,y:ty});
+    if(pendingBuild==='wall')return;
+    mode=null;setBanner(null);
+    toast(BUILDNAME[pendingBuild]+' yerleştirildi. Boştaki işçi otomatik inşa eder; yoksa bir işçiye "İnşa Et" görevi ver.');return;}
+  if(mode==='attack'){
+    let tgt=null;
+    for(const k of state.workers){
+      if(k.c===you.countryId)continue;
+      const p=renderPos.get(k.id)||k;
+      if(Math.hypot(p.x-wx,p.y-wy)<0.8){tgt={kind:'worker',id:k.id};break;}
+    }
+    if(!tgt)for(const b of state.buildings){
+      if(b.c===you.countryId)continue;
+      if(Math.hypot(b.x-wx,b.y-wy)<0.8){tgt={kind:'building',id:b.id};break;}
+    }
+    if(!tgt)return toast('Düşman işçisine veya binasına tıkla');
+    const soldiers=state.workers.filter(k=>k.c===you.countryId&&k.sol);
+    const attackers=selectedWorker!=null?soldiers.filter(k=>k.id===selectedWorker):soldiers;
+    if(!attackers.length)return toast('Askerin yok — asker kampından asker yetiştir');
+    for(const s of attackers)send({t:'attack',id:s.id,target:tgt});
+    toast(attackers.length+' asker saldırıya geçti!');
+    mode=null;setBanner(null);selectedWorker=null;$('wmenu').classList.add('hidden');
+    return;
+  }
+  const myC=you.countryId;
+  let best=null,bd=0.8;
+  for(const k of state.workers){
+    if(k.c!==myC)continue;
+    const p=renderPos.get(k.id)||k;
+    const d=Math.hypot(p.x-wx,p.y-wy);
+    if(d<bd){bd=d;best=k;}
+  }
+  if(best){openWorkerMenu(best);return;}
+  for(const b of state.buildings){
+    if(b.c!==myC||b.type==='house'||!b.done)continue;
+    if(Math.hypot(b.x-wx,b.y-wy)<0.8){openBuildingMenu(b);return;}
+  }
+  selectedWorker=null;$('wmenu').classList.add('hidden');
+}
+
+/* ---------- minimap ---------- */
+const mm=$('minimap'),mmx=mm.getContext('2d');
+let mmBase=null;
+function buildMinimapBase(){
+  mmBase=document.createElement('canvas');mmBase.width=SIZE;mmBase.height=SIZE;
+  const g=mmBase.getContext('2d');
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){g.fillStyle=tiles[y*SIZE+x]===1?'#2563eb':'#3f8f4f';g.fillRect(x,y,1,1);}
+}
+mm.addEventListener('mousedown',e=>{
+  const r=mm.getBoundingClientRect();
+  cam.x=(e.clientX-r.left)/r.width*SIZE;cam.y=(e.clientY-r.top)/r.height*SIZE;
+});
+function drawMinimap(){
+  if(!mmBase)return;
+  mmx.clearRect(0,0,160,160);mmx.drawImage(mmBase,0,0,160,160);
+  const s=160/SIZE;
+  for(const b of state.buildings){const c=state.countries.find(c=>c.id===b.c);mmx.fillStyle=c?c.color:'#fff';mmx.fillRect(b.x*s-1.5,b.y*s-1.5,3,3);}
+  for(const k of state.workers){const c=state.countries.find(c=>c.id===k.c);mmx.fillStyle=c?c.color:'#fff';mmx.fillRect(k.x*s-1,k.y*s-1,2,2);}
+  const vw=cv.width/ts()*s,vh=cv.height/ts()*s;
+  mmx.strokeStyle='#fff';mmx.lineWidth=1;mmx.strokeRect(cam.x*s-vw/2,cam.y*s-vh/2,vw,vh);
+}
+
+/* ---------- çizim ---------- */
+let last=performance.now(),time=0,lastUI=0,lastMM=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min((now-last)/1000,0.05);last=now;time+=dt;
+  if(screen!=='game'){return;}
+  // kamera klavye
+  const sp=18*dt/cam.zoom;
+  if(keys['ArrowLeft']||keys['KeyA'])cam.x-=sp;if(keys['ArrowRight']||keys['KeyD'])cam.x+=sp;
+  if(keys['ArrowUp']||keys['KeyW'])cam.y-=sp;if(keys['ArrowDown']||keys['KeyS'])cam.y+=sp;
+  cam.x=clamp(cam.x,0,SIZE);cam.y=clamp(cam.y,0,SIZE);
+  // interpolasyon
+  const f=1-Math.exp(-10*dt);
+  for(const k of state.workers){
+    let p=renderPos.get(k.id);if(!p){p={x:k.x,y:k.y};renderPos.set(k.id,p);}
+    p.x+=(k.x-p.x)*f;p.y+=(k.y-p.y)*f;
+  }
+  draw();
+  if(now-lastMM>200){lastMM=now;drawMinimap();}
+  if(now-lastUI>250){lastUI=now;updateHUD();}
+}
+function countryOf(id){return countryMap.get(id);}
+function draw(){
+  const T=ts();
+  ctx.fillStyle='#10141c';ctx.fillRect(0,0,cv.width,cv.height);
+  const [wx0,wy0]=s2w(0,0),[wx1,wy1]=s2w(cv.width,cv.height);
+  const x0=clamp(Math.floor(wx0)-1,0,SIZE-1),x1=clamp(Math.ceil(wx1)+1,0,SIZE-1);
+  const y0=clamp(Math.floor(wy0)-1,0,SIZE-1),y1=clamp(Math.ceil(wy1)+1,0,SIZE-1);
+  // kareler
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    const [sx,sy]=w2s(x-0.5,y-0.5);
+    if(tiles[y*SIZE+x]===1){
+      ctx.fillStyle=((x+y)%2===0)?'#2563eb':'#2b6ff0';
+      ctx.fillRect(sx,sy,T+1,T+1);
+      if((x*3+y*5)%7===0){ctx.fillStyle='rgba(255,255,255,'+(0.08+0.05*Math.sin(time*2+x))+')';ctx.fillRect(sx+T*0.2,sy+T*0.4,T*0.6,T*0.12);}
+    }else{
+      const v=((x*7+y*13)%3);
+      ctx.fillStyle=['#3f8f4f','#419552','#3d8a4c'][v];
+      ctx.fillRect(sx,sy,T+1,T+1);
+    }
+  }
+  // bölge rengi
+  for(const b of state.buildings){if(!b.done||b.type==='wall')continue;const c=countryOf(b.c);if(!c)continue;
+    const [sx,sy]=w2s(b.x,b.y);ctx.fillStyle=c.color+'14';ctx.beginPath();ctx.arc(sx,sy,5*T,0,7);ctx.fill();}
+  // kaynaklar
+  for(const n of nodes.values()){
+    if(n.x<x0||n.x>x1||n.y<y0||n.y>y1)continue;
+    if(n.amount===0)continue;
+    const [sx,sy]=w2s(n.x,n.y);
+    if(n.type==='tree'){
+      ctx.fillStyle='#6b4423';ctx.fillRect(sx-T*0.07,sy-T*0.05,T*0.14,T*0.3);
+      ctx.fillStyle='#1b5e20';ctx.beginPath();ctx.arc(sx,sy-T*0.15,T*0.32,0,7);ctx.fill();
+      ctx.fillStyle='#2e7d32';ctx.beginPath();ctx.arc(sx-T*0.08,sy-T*0.22,T*0.2,0,7);ctx.fill();
+    }else if(n.type==='rock'){
+      ctx.fillStyle='#94a3b8';ctx.beginPath();
+      ctx.moveTo(sx-T*0.3,sy+T*0.25);ctx.lineTo(sx-T*0.12,sy-T*0.25);ctx.lineTo(sx+T*0.15,sy-T*0.15);ctx.lineTo(sx+T*0.3,sy+T*0.25);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#cbd5e1';ctx.fillRect(sx-T*0.1,sy-T*0.1,T*0.12,T*0.12);
+    }else if(n.type==='iron'){
+      ctx.fillStyle='#57493f';ctx.beginPath();
+      ctx.moveTo(sx-T*0.3,sy+T*0.25);ctx.lineTo(sx-T*0.14,sy-T*0.22);ctx.lineTo(sx+T*0.12,sy-T*0.18);ctx.lineTo(sx+T*0.3,sy+T*0.25);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#f59e0b';ctx.fillRect(sx-T*0.12,sy-T*0.06,T*0.1,T*0.1);ctx.fillRect(sx+T*0.05,sy+T*0.05,T*0.09,T*0.09);
+    }else if(n.type==='fish'){
+      ctx.fillStyle='#fb923c';ctx.beginPath();ctx.ellipse(sx,sy,T*0.18,T*0.1,0,0,7);ctx.fill();
+      ctx.beginPath();ctx.moveTo(sx+T*0.16,sy);ctx.lineTo(sx+T*0.3,sy-T*0.1);ctx.lineTo(sx+T*0.3,sy+T*0.1);ctx.closePath();ctx.fill();
+    }
+  }
+  // binalar
+  for(const b of state.buildings){
+    const [sx,sy]=w2s(b.x,b.y);const c=countryOf(b.c);const col=c?c.color:'#fff';
+    if(b.type==='camp'){
+      ctx.strokeStyle='#6b4423';ctx.lineWidth=T*0.12;
+      ctx.beginPath();ctx.moveTo(sx-T*0.3,sy+T*0.2);ctx.lineTo(sx+T*0.3,sy+T*0.2);ctx.stroke();
+      const fl=0.8+0.3*Math.sin(time*9+b.x);
+      ctx.fillStyle='#f97316';ctx.beginPath();ctx.moveTo(sx-T*0.2,sy+T*0.15);ctx.lineTo(sx,sy-T*0.35*fl);ctx.lineTo(sx+T*0.2,sy+T*0.15);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fde047';ctx.beginPath();ctx.moveTo(sx-T*0.1,sy+T*0.15);ctx.lineTo(sx,sy-T*0.15*fl);ctx.lineTo(sx+T*0.1,sy+T*0.15);ctx.closePath();ctx.fill();
+      if(c){ctx.fillStyle='#fff';ctx.font='bold '+Math.max(10,T*0.4)+'px sans-serif';ctx.textAlign='center';
+        ctx.strokeStyle='rgba(0,0,0,.6)';ctx.lineWidth=3;
+        const label=c.name+(b.lvl>1?' ★'+b.lvl:'');
+        ctx.strokeText(label,sx,sy-T*0.6);ctx.fillText(label,sx,sy-T*0.6);}
+    }else if(b.type==='house'){
+      if(b.done){
+        ctx.fillStyle='#d6a35c';ctx.fillRect(sx-T*0.32,sy-T*0.1,T*0.64,T*0.42);
+        ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(sx-T*0.4,sy-T*0.08);ctx.lineTo(sx,sy-T*0.45);ctx.lineTo(sx+T*0.4,sy-T*0.08);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#5b3a1e';ctx.fillRect(sx-T*0.08,sy+T*0.1,T*0.16,T*0.22);
+      }else{
+        ctx.strokeStyle=col;ctx.setLineDash([4,3]);ctx.lineWidth=2;ctx.strokeRect(sx-T*0.35,sy-T*0.35,T*0.7,T*0.7);ctx.setLineDash([]);
+        ctx.fillStyle='#0d9488';ctx.fillRect(sx-T*0.35,sy+T*0.4,T*0.7*(b.p/100),T*0.1);
+      }
+    }else if(b.type==='barracks'){
+      if(b.done){
+        ctx.fillStyle='#6b7280';ctx.fillRect(sx-T*0.35,sy-T*0.05,T*0.7,T*0.35);
+        ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(sx-T*0.42,sy-T*0.02);ctx.lineTo(sx,sy-T*0.42);ctx.lineTo(sx+T*0.42,sy-T*0.02);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='#d6a35c';ctx.lineWidth=Math.max(1.5,T*0.05);ctx.beginPath();ctx.moveTo(sx+T*0.3,sy-T*0.1);ctx.lineTo(sx+T*0.3,sy-T*0.6);ctx.stroke();
+        ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(sx+T*0.3,sy-T*0.6);ctx.lineTo(sx+T*0.55,sy-T*0.52);ctx.lineTo(sx+T*0.3,sy-T*0.44);ctx.closePath();ctx.fill();
+      }else{
+        ctx.strokeStyle=col;ctx.setLineDash([4,3]);ctx.lineWidth=2;ctx.strokeRect(sx-T*0.4,sy-T*0.4,T*0.8,T*0.8);ctx.setLineDash([]);
+        ctx.fillStyle='#0d9488';ctx.fillRect(sx-T*0.4,sy+T*0.44,T*0.8*(b.p/100),T*0.1);
+      }
+    }else if(b.type==='smith'){
+      if(b.done){
+        ctx.fillStyle='#4b5563';ctx.fillRect(sx-T*0.35,sy-T*0.1,T*0.7,T*0.4);
+        ctx.fillStyle='#374151';ctx.fillRect(sx+T*0.12,sy-T*0.45,T*0.16,T*0.4);
+        ctx.fillStyle='#f97316';ctx.fillRect(sx-T*0.25,sy,T*0.18,T*0.15);
+        ctx.fillStyle='#9ca3af';ctx.fillRect(sx-T*0.05,sy+T*0.05,T*0.3,T*0.08);ctx.fillRect(sx+T*0.03,sy+T*0.13,T*0.14,T*0.12);
+      }else{
+        ctx.strokeStyle=col;ctx.setLineDash([4,3]);ctx.lineWidth=2;ctx.strokeRect(sx-T*0.4,sy-T*0.4,T*0.8,T*0.8);ctx.setLineDash([]);
+        ctx.fillStyle='#0d9488';ctx.fillRect(sx-T*0.4,sy+T*0.44,T*0.8*(b.p/100),T*0.1);
+      }
+    }else if(b.type==='depo'){
+      if(b.done){
+        ctx.fillStyle='#8b5a2b';ctx.fillRect(sx-T*0.4,sy-T*0.15,T*0.8,T*0.45);
+        ctx.fillStyle='#6b4423';ctx.beginPath();ctx.moveTo(sx-T*0.46,sy-T*0.12);ctx.lineTo(sx,sy-T*0.45);ctx.lineTo(sx+T*0.46,sy-T*0.12);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#d6a35c';ctx.fillRect(sx-T*0.3,sy+T*0.02,T*0.2,T*0.18);ctx.fillRect(sx-T*0.05,sy-T*0.02,T*0.18,T*0.22);
+        ctx.fillStyle='#4a2f16';ctx.fillRect(sx+T*0.16,sy+T*0.05,T*0.18,T*0.25);
+      }else{
+        ctx.strokeStyle=col;ctx.setLineDash([4,3]);ctx.lineWidth=2;ctx.strokeRect(sx-T*0.4,sy-T*0.4,T*0.8,T*0.8);ctx.setLineDash([]);
+        ctx.fillStyle='#0d9488';ctx.fillRect(sx-T*0.4,sy+T*0.44,T*0.8*(b.p/100),T*0.1);
+      }
+    }else if(b.type==='tower'){
+      if(b.done){
+        ctx.fillStyle='#9ca3af';ctx.fillRect(sx-T*0.22,sy-T*0.4,T*0.44,T*0.7);
+        ctx.fillStyle='#6b7280';
+        ctx.fillRect(sx-T*0.28,sy-T*0.52,T*0.14,T*0.14);ctx.fillRect(sx-T*0.07,sy-T*0.52,T*0.14,T*0.14);ctx.fillRect(sx+T*0.14,sy-T*0.52,T*0.14,T*0.14);
+        ctx.fillStyle='#1f2937';ctx.fillRect(sx-T*0.07,sy-T*0.2,T*0.14,T*0.2);
+        ctx.strokeStyle='#d6a35c';ctx.lineWidth=Math.max(1,T*0.04);ctx.beginPath();ctx.moveTo(sx,sy-T*0.52);ctx.lineTo(sx,sy-T*0.75);ctx.stroke();
+        ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(sx,sy-T*0.75);ctx.lineTo(sx+T*0.22,sy-T*0.68);ctx.lineTo(sx,sy-T*0.61);ctx.closePath();ctx.fill();
+      }else{
+        ctx.strokeStyle=col;ctx.setLineDash([4,3]);ctx.lineWidth=2;ctx.strokeRect(sx-T*0.35,sy-T*0.5,T*0.7,T*0.85);ctx.setLineDash([]);
+        ctx.fillStyle='#0d9488';ctx.fillRect(sx-T*0.35,sy+T*0.4,T*0.7*(b.p/100),T*0.1);
+      }
+    }else if(b.type==='wall'){
+      const k=(x,y)=>wallAt.has(y*SIZE+x);
+      ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(2,T*0.14);ctx.beginPath();
+      if(k(b.x-1,b.y)){ctx.moveTo(sx-T*0.5,sy);ctx.lineTo(sx,sy);}
+      if(k(b.x+1,b.y)){ctx.moveTo(sx,sy);ctx.lineTo(sx+T*0.5,sy);}
+      if(k(b.x,b.y-1)){ctx.moveTo(sx,sy-T*0.5);ctx.lineTo(sx,sy);}
+      if(k(b.x,b.y+1)){ctx.moveTo(sx,sy);ctx.lineTo(sx,sy+T*0.5);}
+      ctx.stroke();
+      ctx.fillStyle='#a06a35';ctx.fillRect(sx-T*0.15,sy-T*0.22,T*0.3,T*0.44);
+      ctx.fillStyle='#6b4423';ctx.fillRect(sx-T*0.15,sy-T*0.22,T*0.3,T*0.09);
+    }
+    const maxhp={camp:12,house:8,barracks:10,smith:10,depo:15,wall:6,tower:8}[b.type]||8;
+    if(b.hp!=null&&b.hp<maxhp){
+      ctx.fillStyle='#7f1d1d';ctx.fillRect(sx-T*0.4,sy-T*0.55,T*0.8,T*0.08);
+      ctx.fillStyle='#22c55e';ctx.fillRect(sx-T*0.4,sy-T*0.55,T*0.8*clamp(b.hp/maxhp,0,1),T*0.08);
+    }
+  }
+  // adamlar
+  for(const k of state.workers){
+    const p=renderPos.get(k.id)||k;const [sx,sy]=w2s(p.x,p.y);const c=countryOf(k.c);const col=c?c.color:'#fff';const era=c?(c.era||0):0;
+    if(k.id===selectedWorker){ctx.strokeStyle='#fde047';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(sx,sy,T*0.46,0,7);ctx.stroke();}
+    if(k.sol&&era>=2){
+      // şövalye: parlak zırh + miğfer tüyü + kalkan + kılıç
+      ctx.fillStyle='#9aa7b8';ctx.beginPath();ctx.arc(sx,sy,T*0.32,0,7);ctx.fill();
+      ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.stroke();
+      ctx.fillStyle='#e8edf4';ctx.beginPath();ctx.arc(sx,sy-T*0.1,T*0.13,0,7);ctx.fill();
+      ctx.fillStyle='#6b7686';ctx.beginPath();ctx.arc(sx,sy-T*0.14,T*0.16,Math.PI,0);ctx.fill();
+      ctx.fillStyle='#ef4444';ctx.beginPath();ctx.moveTo(sx,sy-T*0.3);ctx.quadraticCurveTo(sx+T*0.12,sy-T*0.5,sx-T*0.04,sy-T*0.52);ctx.quadraticCurveTo(sx-T*0.02,sy-T*0.36,sx,sy-T*0.3);ctx.fill();
+      ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(sx-T*0.34,sy-T*0.12);ctx.lineTo(sx-T*0.14,sy-T*0.12);ctx.lineTo(sx-T*0.14,sy+T*0.1);ctx.lineTo(sx-T*0.24,sy+T*0.22);ctx.lineTo(sx-T*0.34,sy+T*0.1);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#e5e7eb';ctx.lineWidth=Math.max(1.5,T*0.07);
+      ctx.beginPath();ctx.moveTo(sx+T*0.3,sy+T*0.28);ctx.lineTo(sx+T*0.3,sy-T*0.4);ctx.stroke();
+      ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(1.5,T*0.06);
+      ctx.beginPath();ctx.moveTo(sx+T*0.2,sy-T*0.12);ctx.lineTo(sx+T*0.4,sy-T*0.12);ctx.stroke();
+    }else if(k.sol){
+      // asker üniforması + miğfer + mızrak
+      ctx.fillStyle='#4a5d3a';ctx.beginPath();ctx.arc(sx,sy,T*0.32,0,7);ctx.fill();
+      ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#ffe0b2';ctx.beginPath();ctx.arc(sx,sy-T*0.1,T*0.12,0,7);ctx.fill();
+      ctx.fillStyle='#37462c';ctx.beginPath();ctx.arc(sx,sy-T*0.14,T*0.15,Math.PI,0);ctx.fill();
+      ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(1.5,T*0.06);
+      ctx.beginPath();ctx.moveTo(sx+T*0.3,sy+T*0.32);ctx.lineTo(sx+T*0.3,sy-T*0.38);ctx.stroke();
+      ctx.fillStyle='#cbd5e1';ctx.beginPath();ctx.moveTo(sx+T*0.3,sy-T*0.52);ctx.lineTo(sx+T*0.24,sy-T*0.36);ctx.lineTo(sx+T*0.36,sy-T*0.36);ctx.closePath();ctx.fill();
+    }else{
+      ctx.fillStyle=era===0?'#a9825f':col;ctx.beginPath();ctx.arc(sx,sy,T*0.32,0,7);ctx.fill();
+      ctx.strokeStyle=era===0?'#6b4f35':'#fff';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='#ffe0b2';ctx.beginPath();ctx.arc(sx,sy-T*0.12,T*0.13,0,7);ctx.fill();
+      if(era===0){
+        // ilkel insan: saç + sopası
+        ctx.fillStyle='#4b3621';ctx.beginPath();ctx.arc(sx,sy-T*0.18,T*0.14,Math.PI*0.95,Math.PI*2.05);ctx.fill();
+        ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(1.5,T*0.07);
+        ctx.beginPath();ctx.moveTo(sx+T*0.24,sy+T*0.22);ctx.lineTo(sx+T*0.4,sy-T*0.24);ctx.stroke();
+        ctx.fillStyle='#6b4f35';ctx.beginPath();ctx.arc(sx+T*0.4,sy-T*0.26,T*0.09,0,7);ctx.fill();
+      }
+      // meslek kıyafeti / aksesuarı
+      if(k.task==='fish'){
+        ctx.fillStyle='#1e88e5';ctx.fillRect(sx-T*0.2,sy,T*0.4,T*0.22);
+        ctx.fillStyle='#0d47a1';ctx.beginPath();ctx.arc(sx,sy-T*0.18,T*0.14,Math.PI,0);ctx.fill();
+        ctx.strokeStyle='#d6a35c';ctx.lineWidth=Math.max(1,T*0.05);
+        ctx.beginPath();ctx.moveTo(sx+T*0.2,sy+T*0.1);ctx.lineTo(sx+T*0.42,sy-T*0.35);ctx.stroke();
+        ctx.strokeStyle='#e5e7eb';ctx.beginPath();ctx.moveTo(sx+T*0.42,sy-T*0.35);ctx.lineTo(sx+T*0.42,sy-T*0.05);ctx.stroke();
+      }else if(k.task==='wood'){
+        ctx.fillStyle='#ff7043';ctx.beginPath();ctx.arc(sx,sy-T*0.18,T*0.14,Math.PI,0);ctx.fill();
+        ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(1.5,T*0.06);
+        ctx.beginPath();ctx.moveTo(sx+T*0.22,sy+T*0.2);ctx.lineTo(sx+T*0.38,sy-T*0.2);ctx.stroke();
+        ctx.fillStyle='#cbd5e1';ctx.fillRect(sx+T*0.3,sy-T*0.3,T*0.16,T*0.12);
+      }else if(k.task==='mine'||k.task==='iron'){
+        ctx.fillStyle=k.task==='iron'?'#94a3b8':'#fdd835';ctx.beginPath();ctx.arc(sx,sy-T*0.18,T*0.14,Math.PI,0);ctx.fill();
+        ctx.strokeStyle='#8b5a2b';ctx.lineWidth=Math.max(1.5,T*0.06);
+        ctx.beginPath();ctx.moveTo(sx+T*0.22,sy+T*0.2);ctx.lineTo(sx+T*0.38,sy-T*0.22);ctx.stroke();
+        ctx.strokeStyle='#9ca3af';ctx.beginPath();ctx.arc(sx+T*0.33,sy-T*0.18,T*0.1,Math.PI*0.9,Math.PI*2.1);ctx.stroke();
+      }else if(k.task==='build'){
+        ctx.fillStyle='#fdd835';ctx.beginPath();ctx.arc(sx,sy-T*0.18,T*0.14,Math.PI,0);ctx.fill();
+        ctx.fillStyle='#f59e0b';ctx.fillRect(sx-T*0.2,sy,T*0.4,T*0.1);
+      }
+    }
+    if(k.carry){ctx.fillStyle={wood:'#d6a35c',fish:'#7dd3fc',stone:'#cbd5e1',iron:'#f59e0b'}[k.carry.t];ctx.fillRect(sx+T*0.22,sy-T*0.34,T*0.18,T*0.18);}
+    if(k.hp!=null&&k.mh&&k.hp<k.mh){
+      ctx.fillStyle='#7f1d1d';ctx.fillRect(sx-T*0.3,sy-T*0.46,T*0.6,T*0.07);
+      ctx.fillStyle='#22c55e';ctx.fillRect(sx-T*0.3,sy-T*0.46,T*0.6*clamp(k.hp/k.mh,0,1),T*0.07);
+    }
+    const tl=k.sol?(k.task==='attack'?'Saldırı':(era>=2?'Şövalye':'Asker')):{wood:'Odun',fish:'Balık',mine:'Maden',iron:'Demir',build:'İnşa'}[k.task];
+    if(tl){ctx.fillStyle='rgba(255,255,255,.92)';ctx.font='bold '+Math.max(8,T*0.26)+'px sans-serif';ctx.textAlign='center';
+      ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=2;ctx.strokeText(tl,sx,sy-T*0.56);ctx.fillText(tl,sx,sy-T*0.56);}
+  }
+  // hayalet (kurma / taşıma modu)
+  if(mode==='found'||mode==='build'||mode==='rebuildCamp'||mode==='moveBuilding'){
+    const [wx,wy]=s2w(mouse.x,mouse.y);const tx=Math.round(wx),ty=Math.round(wy);
+    const ok=emptyLand(tx,ty);const [sx,sy]=w2s(tx,ty);
+    ctx.fillStyle=ok?'rgba(94,234,212,.3)':'rgba(239,68,68,.35)';
+    ctx.fillRect(sx-T*0.5,sy-T*0.5,T,T);
+    ctx.strokeStyle=ok?'#5eead4':'#ef4444';ctx.lineWidth=2;ctx.strokeRect(sx-T*0.5,sy-T*0.5,T,T);
+  }
+}
+const hudCache={};
+function setText(id,v){if(hudCache[id]!==v){hudCache[id]=v;$(id).textContent=v;}}
+function updateHUD(){
+  const my=countryOf(you.countryId);
+  setText('hCn',my?my.name:'Ülke yok');
+  const col=my?my.color:'#555';
+  if(hudCache._col!==col){hudCache._col=col;$('hCd').style.background=col;}
+  if(my){setText('hWood',my.res.wood);setText('hFish',my.res.fish);setText('hStone',my.res.stone);setText('hIron',my.res.iron||0);
+    setText('hPop',my.pop+'/'+my.popCap);
+    setText('hEra',['İlkel Çağ','Taş Devri','Rönesans'][my.era||0]);setText('hLvl',my.campLevel||1);}
+  setText('hOnline',state.online);
+  const showBulk=!!you.countryId;
+  if(hudCache._bulk!==showBulk){hudCache._bulk=showBulk;$('bulk').classList.toggle('hidden',!showBulk);}
+}
+requestAnimationFrame(frame);
+connect();
+</script>
+</body>
+</html>
